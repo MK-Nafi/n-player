@@ -159,7 +159,6 @@ fun PlayerScreen(
                         modifier = Modifier
                             .weight(1f)
                             .padding(horizontal = 8.dp)
-                        // weight comes from RowScope — no import needed
                     )
                     IconButton(
                         onClick = {
@@ -254,6 +253,7 @@ fun PlayerScreen(
                         )
                     }
                 }
+            }
         }
     }
 }
