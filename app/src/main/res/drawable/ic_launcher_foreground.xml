@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Play triangle -->
+    <path
+        android:fillColor="#20B8AA"
+        android:pathData="M44,36 L44,72 C44,74.2 46.5,75.4 48.3,74.1 L73.4,56.1 C75,55 75,52.5 73.4,51.4 L48.3,33.4 C46.5,32.1 44,33.3 44,36 Z" />
+    <!-- Letter N -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M33,40 h4.8 v18.8 L47.6,40 h5.4 v28 h-4.8 V49.2 L37.8,68 h-4.8 Z" />
+</vector>
