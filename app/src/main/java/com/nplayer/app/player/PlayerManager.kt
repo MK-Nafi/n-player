@@ -25,14 +25,10 @@ class PlayerManager(context: Context) {
     private var currentMedia: Media? = null
 
     /**
-     * Opens the given video URI and prepares playback (paused until
-     * [play] is called or [MediaPlayer.play] is invoked).
+     * Opens the given video URI and prepares it for playback.
      */
     fun openMedia(uri: Uri) {
-        currentMedia?.let {
-            it.detachViews()
-            it.release()
-        }
+        currentMedia?.release()
         val media = Media(libVlc, uri)
         media.parseAsync(IMedia.ParseType.ParseLocal)
         currentMedia = media
@@ -42,6 +38,7 @@ class PlayerManager(context: Context) {
     /** Releases LibVLC resources. Call once when the app process ends. */
     fun release() {
         mediaPlayer.stop()
+        mediaPlayer.detachViews()
         currentMedia?.release()
         mediaPlayer.release()
         libVlc.release()
