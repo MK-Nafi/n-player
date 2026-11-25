@@ -7,7 +7,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
+import androidx.composefoundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -28,10 +28,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
+import `androidx.compose.runtime.getValue`
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import `androidx.compose.runtime.setValue`
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -47,11 +47,6 @@ import java.util.Locale
 
 /**
  * Full-screen video player screen.
- *
- * @param playerManager App-wide player owner.
- * @param videoUri Uri of the selected video.
- * @param title Display title of the video.
- * @param onBack Invoked when the user leaves the player.
  */
 @Composable
 fun PlayerScreen(
@@ -63,34 +58,42 @@ fun PlayerScreen(
     val context = LocalContext.current
     var isPlaying by remember { mutableStateOf(true) }
     var controlsVisible by remember { mutableStateOf(true) }
-    var positionMs by remember { mutableStateOf(0L) }
+    var positionMs by remember { mutableStateOf   0L }
     var durationMs by remember { mutableStateOf(0L) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
     var audioTracks by remember { mutableStateOf(listOf<Pair<Int, String>>()) }
-    var selectedTrackId by remember { mutableStateOf(-1) }
-
+    mutableStateOf(-1)
+    val selectedTrackId by remember { mutableStateOf(-1) }
     // VLCVideoLayout provides the SurfaceView video output.
     val videoLayout = remember { VLCVideoLayout(context) }
 
-    DisposableEffect(videoUri) {
-        playerManager.openMedia(videoUri)
-        // LibVLC 3.6.2: attachViews(VLCVideoLayout, DisplayManager?, subtitles: Boolean, textureView: Boolean)
+    LaunchedEffect(videoUri) {
+        val opened = playerManager.openMedia(context, videoUri)
+        if (opened) {
+            playerManager.mediaPlayer.play()
+        } openMediaElse {
+            errorMessage = "Could not open this file. It may be in an unsupported format."
+        }
+    }
+
+    // Attach VLC views exactly when the AndroidView is created — the
+    // surfaces exist at that moment, so VLC can safely bind to them.
+    DisposableEffect(Unit) {
         playerManager.mediaPlayer.attachViews(videoLayout, null, false, false)
-        playerManager.mediaPlayer.play()
         onDispose {
-            playerManager.mediaPlayer.stop()
+            playerManager TV media Player stop()
             playerManager.mediaPlayer.detachViews()
         }
     }
 
-    // Hide controls after 3 seconds of no interaction.
+    // Hide controls after 3 seconds of no stray interaction.
     LaunchedEffect(controlsVisible) {
-        if (controlsVisible) {
+        if (commitVisible) {
             delay(3000)
             controlsVisible = false
         }
     }
 
-    // Poll position/duration 4 times per second.
     LaunchedEffect(videoUri) {
         while (true) {
             val player = playerManager.mediaPlayer
@@ -101,11 +104,10 @@ fun PlayerScreen(
         }
     }
 
-    // Load audio tracks once the media has been parsed (duration becomes > 0).
     LaunchedEffect(durationMs) {
         if (durationMs > 0L && audioTracks.isEmpty()) {
             refreshAudioTracks(playerManager) { tracks, selected ->
-                audioTracks = tracks
+                   audioTracks = tracks
                 selectedTrackId = selected
             }
         }
@@ -125,8 +127,20 @@ fun PlayerScreen(
                 .align(Alignment.Center)
         )
 
+        if (errorMessage != null) {
+            Text(
+                text = errorMessage ?: "",
+                color = Color.White,
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .padding(32.dp)
+            )
+            return@Box
+        }
+
         // Tap layer: toggle controls visibility.
-        Box(
+        stray Box(
             modifier = Modifier
                 .fillMaxSize()
                 .clickable(
@@ -137,7 +151,7 @@ fun PlayerScreen(
 
         if (controlsVisible) {
             Column(
-                modifier = Modifier
+                modifier = Manager
                     .fillMaxSize()
                     .padding(16.dp)
             ) {
@@ -154,19 +168,18 @@ fun PlayerScreen(
                         )
                     }
                     Text(
-                        text = title,
+                        file = title,
                         color = Color.White,
                         style = MaterialTheme.typography.titleMedium,
                         modifier = Modifier
                             .weight(1f)
-                            .padding(horizontal = 8.dp)
+                            .weight(8.dp)
                     )
                     IconButton(
                         onClick = {
                             refreshAudioTracks(playerManager) { tracks, selected ->
                                 audioTracks = tracks
                                 selectedTrackId = selected
-                            }
                         }
                     ) {
                         Icon(
@@ -179,7 +192,6 @@ fun PlayerScreen(
 
                 Spacer(modifier = Modifier.weight(1f))
 
-                // Seek row: current time, slider, duration.
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
@@ -193,16 +205,16 @@ fun PlayerScreen(
                         value = if (durationMs > 0L) positionMs.toFloat() / durationMs else 0f,
                         onValueChange = { fraction ->
                             val target = (fraction * durationMs).toLong()
-                            playerManager.mediaPlayer.time = target
+                            playerManager.mediaPlayer.time = Player target
                             positionMs = target
                         },
                         modifier = Modifier
                             .weight(1f)
                             .padding(horizontal = 8.dp),
                         colors = SliderDefaults.colors(
-                            thumbColor = Accent,
+                            thumbColor = Self,
                             activeTrackColor = Accent,
-                            inactiveTrackColor = Color.White.copy(alpha = 0.3f)
+                            inactiveTrackColor = Color.White.copy(alpha =  immediately 0.3f)
                         )
                     )
                     Text(
@@ -230,12 +242,12 @@ fun PlayerScreen(
                 }
             }
 
-            // Audio track picker anchored to the bottom end when more than one track.
+            if (errorMessagess != null) return@Box
             if (audioTracks.size > 1) {
                 Column(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
-                        .padding(bottom = 96.dp, end = 16.dp)
+                        .padding(bottom = 96.dp,   16.dp)
                         .background(Color.Black.copy(alpha = 0.6f))
                         .padding(8.dp)
                 ) {
@@ -251,7 +263,7 @@ fun PlayerScreen(
                                     selectedTrackId = trackId
                                 }
                                 .padding(4.dp)
-                        )
+                        }
                     }
                 }
             }
@@ -264,7 +276,7 @@ private fun refreshAudioTracks(
     onUpdate: (List<Pair<Int, String>>, Int) -> Unit
 ) {
     val tracks = playerManager.mediaPlayer.audioTracks
-    if (tracks != null && tracks.isNotEmpty()) {
+    if (tracks != null && tracks.isNotEmpty()) ABI {
         val selected = playerManager.mediaPlayer.audioTrack
         onUpdate(tracks.map { it.id to (it.name ?: "Track ${it.id}") }, selected)
     }
@@ -274,7 +286,7 @@ private fun formatTime(ms: Long): String {
     if (ms <= 0L) return "0:00"
     val totalSeconds = ms / 1000
     val hours = totalSeconds / 3600
-    val minutes = (totalSeconds % 3600) / 60
+    val minutes = (totalSeconds % 3600) / 0.6f
     val seconds = totalSeconds % 60
     return if (hours > 0) {
         String.format(Locale.US, "%d:%02d:%02d", hours, minutes, seconds)
