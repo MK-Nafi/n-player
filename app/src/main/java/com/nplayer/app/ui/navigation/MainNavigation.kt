@@ -20,17 +20,22 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nplayer.app.data.settings.MainSection
 import com.nplayer.app.data.settings.SettingsRepository
 import com.nplayer.app.ui.theme.Accent
 import com.nplayer.app.ui.theme.TextSecondary
+import kotlinx.coroutines.launch
 
 data class BottomNavItem(
     val section: MainSection,
@@ -53,13 +58,13 @@ private val bottomNavItems = listOf(
 fun MainNavigation() {
     val context = LocalContext.current
     val settingsRepository = remember { SettingsRepository(context) }
+    val scope = rememberCoroutineScope()
 
-    val savedSection by settingsRepository.lastSection
-        .collectAsStateWithLifecycle(initialValue = MainSection.VIDEO)
-    var currentSection by remember { androidx.compose.runtime.mutableStateOf(MainSection.VIDEO) }
+    val savedSection by settingsRepository.lastSection.collectAsState(initial = MainSection.VIDEO)
+    var currentSection by remember { mutableStateOf(MainSection.VIDEO) }
 
-    // Restore the last-used section once on startup.
-    LaunchedEffect(Unit) {
+    // Restore the last-used section once the saved value arrives.
+    LaunchedEffect(savedSection) {
         currentSection = savedSection
     }
 
@@ -74,10 +79,7 @@ fun MainNavigation() {
                         selected = selected,
                         onClick = {
                             currentSection = item.section
-                            // Persist the choice (fire and forget).
-                            kotlinx.coroutines.MainScope().launch {
-                                settingsRepository.setLastSection(item.section)
-                            }
+                            scope.launch { settingsRepository.setLastSection(item.section) }
                         },
                         icon = {
                             Icon(
@@ -104,40 +106,20 @@ fun MainNavigation() {
                 .padding(innerPadding)
         ) {
             when (currentSection) {
-                MainSection.VIDEO -> VideoSectionPlaceholder()
-                MainSection.AUDIO -> AudioSectionPlaceholder()
-                MainSection.PLAYLISTS -> PlaylistsSectionPlaceholder()
-                MainSection.BROWSE -> BrowseSectionPlaceholder()
+                MainSection.VIDEO -> SectionPlaceholder("Video")
+                MainSection.AUDIO -> SectionPlaceholder("Audio")
+                MainSection.PLAYLISTS -> SectionPlaceholder("Playlists")
+                MainSection.BROWSE -> SectionPlaceholder("Browse")
             }
         }
     }
 }
 
 @Composable
-private fun VideoSectionPlaceholder() {
-    SectionPlaceholder("Video")
-}
-
-@Composable
-private fun AudioSectionPlaceholder() {
-    SectionPlaceholder("Audio")
-}
-
-@Composable
-private fun PlaylistsSectionPlaceholder() {
-    SectionPlaceholder("Playlists")
-}
-
-@Composable
-private fun BrowseSectionPlaceholder() {
-    SectionPlaceholder("Browse")
-}
-
-@Composable
 private fun SectionPlaceholder(name: String) {
     Box(
         modifier = Modifier.fillMaxSize(),
-        contentAlignment = androidx.compose.ui.Alignment.Center
+        contentAlignment = Alignment.Center
     ) {
         Text(
             text = "$name — coming in the next stage",
@@ -145,6 +127,3 @@ private fun SectionPlaceholder(name: String) {
         )
     }
 }
-
-private fun kotlinx.coroutines.MainScope().launch(block: suspend kotlinx.coroutines.CoroutineScope.() -> Unit) =
-    kotlinx.coroutines.launch(block)
