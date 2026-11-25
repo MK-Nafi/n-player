@@ -26,6 +26,7 @@ class MainActivity : ComponentActivity() {
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val app = application as NPlayerApp
         setContent {
             NPlayerTheme {
                 Column(modifier = Modifier.fillMaxSize()) {
@@ -52,7 +53,7 @@ class MainActivity : ComponentActivity() {
                             titleContentColor = TextPrimary
                         )
                     )
-                    MainNavigation()
+                    MainNavigation(playerManager = app.playerManager)
                 }
             }
         }
