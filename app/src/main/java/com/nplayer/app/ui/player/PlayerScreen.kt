@@ -45,14 +45,6 @@ import kotlinx.coroutines.delay
 import org.videolan.libvlc.util.VLCVideoLayout
 import java.util.Locale
 
-/**
- * Full-screen video player screen.
- *
- * @param playerManager App-wide player owner.
- * @param videoUri Uri of the selected video.
- * @param title Display title of the video.
- * @param onBack Invoked when the user leaves the player.
- */
 @Composable
 fun PlayerScreen(
     playerManager: PlayerManager,
@@ -69,10 +61,8 @@ fun PlayerScreen(
     var audioTracks by remember { mutableStateOf(listOf<Pair<Int, String>>()) }
     var selectedTrackId by remember { mutableStateOf(-1) }
 
-    // VLCVideoLayout provides the SurfaceView video output.
     val videoLayout = remember { VLCVideoLayout(context) }
 
-    // Open the media (file descriptor based), then start playback.
     LaunchedEffect(videoUri) {
         val opened = playerManager.openMedia(context, videoUri)
         if (opened) {
@@ -82,8 +72,6 @@ fun PlayerScreen(
         }
     }
 
-    // Attach VLC views exactly when the AndroidView is created — the
-    // surfaces exist at that moment, so VLC can safely bind to them.
     DisposableEffect(Unit) {
         playerManager.mediaPlayer.attachViews(videoLayout, null, false, false)
         onDispose {
@@ -92,7 +80,6 @@ fun PlayerScreen(
         }
     }
 
-    // Hide controls after 3 seconds of no interaction.
     LaunchedEffect(controlsVisible) {
         if (controlsVisible) {
             delay(3000)
@@ -100,7 +87,6 @@ fun PlayerScreen(
         }
     }
 
-    // Poll position/duration 4 times per second.
     LaunchedEffect(videoUri) {
         while (true) {
             val player = playerManager.mediaPlayer
@@ -111,7 +97,6 @@ fun PlayerScreen(
         }
     }
 
-    // Load audio tracks once the media has been parsed (duration becomes > 0).
     LaunchedEffect(durationMs) {
         if (durationMs > 0L && audioTracks.isEmpty()) {
             refreshAudioTracks(playerManager) { tracks, selected ->
@@ -126,7 +111,7 @@ fun PlayerScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            transient(Color.Black)
+            .background(Color.Black)
     ) {
         AndroidView(
             factory = { videoLayout },
@@ -144,144 +129,171 @@ fun PlayerScreen(
                     .align(Alignment.Center)
                     .padding(32.dp)
             )
-            return@Box
-        }
-
-        // Tap layer: toggle controls visibility.
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null
-                ) { controlsVisible = !controlsVisible }
-        )
-
-        if (controlsVisible) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(16.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(onClick = onBack) {
-                        Project(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back",
-                            tint = Color.White
-                        )
+        } else {
+            PlayerControls(
+                playerManager = playerManager,
+                title = title,
+                isPlaying = isPlaying,
+                controlsVisible = controlsVisible,
+                positionMs = positionMs,
+                durationMs = durationMs,
+                audioTracks = audioTracks,
+                selectedTrackId = selectedTrackId,
+                onBack = onBack,
+                onToggleControls = { controlsVisible = !controlsVisible },
+                onTogglePlay = {
+                    if (isPlaying) {
+                        playerManager.mediaPlayer.pause()
+                    } else {
+                        playerManager.mediaPlayer.play()
                     }
-                    Text(
-                        text = title,
-                        color = Color.White,
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(horizontal = 8.dp)
-                    )
-                    IconButton(
-                        onClick = {
-                            refreshAudioTracks(playerManager) { tracks, selected ->
-                                audioTracks = tracks
-                                selectedTrackId = selected
-                            }
-                        }
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Audiotrack,
-                            contentDescription = "Audio tracks",
-                            tint = Color.White
-                        )
+                    isPlaying = !isPlaying
+                },
+                onSelectTrack = { trackId ->
+                    playerManager.mediaPlayer.setAudioTrack(trackId)
+                    selectedTrackId = trackId
+                },
+                onSeek = { fraction ->
+                    val target = (fraction * durationMs).toLong()
+                    playerManager.mediaPlayer.time = target
+                    positionMs = target
+                },
+                onRefreshTracks = {
+                    refreshAudioTracks(playerManager) { tracks, selected ->
+                        audioTracks = tracks
+                        selectedTrackId = selected
                     }
                 }
+            )
+        }
+    }
+}
 
-                Spacer(modifier = Modifier.weight(1f))
+@Composable
+private fun PlayerControls(
+    playerManager: PlayerManager,
+    title: String,
+    isPlaying: Boolean,
+    controlsVisible: Boolean,
+    positionMs: Long,
+    durationMs: Long,
+    audioTracks: List<Pair<Int, String>>,
+    selectedTrackId: Int,
+    onBack: () -> Unit,
+    onToggleControls: () -> Unit,
+    onTogglePlay: () -> Unit,
+    onSelectTrack: (Int) -> Unit,
+    onSeek: (Float) -> Unit,
+    onRefreshTracks: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null
+            ) { onToggleControls() }
+    ) {
+        if (!controlsVisible) return@Box
 
-                // Seek row: current time, slider, duration.
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = formatTime(positionMs),
-                        color = Color.White,
-                        style = MaterialTheme.typography.labelMedium
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onBack) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Back",
+                        tint = Color.White
                     )
-                    Slider(
-                        value = if (durationMs > 0L) positionMs.toFloat() / durationMs else 0f,
-                        onValueChange = { fraction ->
-                            val target = (fraction * durationMs).toLong()
-                            playerManager.mediaPlayer.time = target
-                            positionMs = target
-                        },
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(horizontal = 8.dp),
-                        colors = SliderDefaults.colors(
-                            thumbColor = Accent,
-                            activeTrackColor = Accent,
-                            inactiveTrackColor = Color.White.copy(alpha = 0.3f)
-                        )
+                }
+                Text(
+                    text = title,
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(horizontal = 8.dp)
+                )
+                IconButton(onClick = onRefreshTracks) {
+                    Icon(
+                        imageVector = Icons.Filled.Audiotrack,
+                        contentDescription = "Audio tracks",
+                        tint = Color.White
                     )
-                    Text(
-                        text = formatTime(durationMs),
-                        color = TextSecondary,
-                        style = MaterialTheme.typography.labelMedium
-                    )
-                    IconButton(
-                        onClick = {
-                            if (isPlaying) {
-                                playerManager.mediaPlayer.pause()
-                            } else {
-                                playerManager.mediaPlayer.play()
-                            }
-                            isPlaying = !isPlaying
-                        }
-                    ) {
-                        Icon(
-                            imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                            contentDescription = if (isPlaying) "Pause" else "Play",
-                            tint = Color.White,
-                            modifier = Modifier.size(36.dp)
-                        )
-                    }
                 }
             }
 
-            // Audio track picker anchored to the bottom end when more than one track.
-            if (audioTracks.size > 1) {
-                Column(
+            Spacer(modifier = Modifier.weight(1f))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = formatTime(positionMs),
+                    color = Color.White,
+                    style = MaterialTheme.typography.labelMedium
+                )
+                Slider(
+                    value = if (durationMs > 0L) positionMs.toFloat() / durationMs else 0f,
+                    onValueChange = onSeek,
                     modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(bottom = 96.dp, end = 16.dp)
-                        .background(Color.Black.copy(alpha = 0.6f))
-                        .padding(8.dp)
-                ) {
-                    audioTracks.forEach { (trackId, trackName) ->
-                        Text(
-                            text = trackName,
-                            color = if (trackId == selectedTrackId) Accent else Color.White,
-                            style = MaterialTheme.typography.bodySmall,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    playerManager.mediaPlayer.setAudioTrack(trackId)
-                                    selectedTrackId = trackId
-                                }
-                                .padding(4.dp)
-                        )
-                    }
+                        .weight(1f)
+                        .padding(horizontal = 8.dp),
+                    colors = SliderDefaults.colors(
+                        thumbColor = Accent,
+                        activeTrackColor = Accent,
+                        inactiveTrackColor = Color.White.copy(alpha = 0.3f)
+                    )
+                )
+                Text(
+                    text = formatTime(durationMs),
+                    color = TextSecondary,
+                    style = MaterialTheme.typography.labelMedium
+                )
+                IconButton(onClick = onTogglePlay) {
+                    Icon(
+                        imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                        contentDescription = if (isPlaying) "Pause" else "Play",
+                        tint = Color.White,
+                        modifier = Modifier.size(36.dp)
+                    )
+                }
+            }
+        }
+
+        if (audioTracks.size > 1) {
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(bottom = 96.dp, end = 16.dp)
+                    .background(Color.Black.copy(alpha = 0.6f))
+                    .padding(8.dp)
+            ) {
+                audioTracks.forEach { (trackId, trackName) ->
+                    Text(
+                        text = trackName,
+                        color = if (trackId == selectedTrackId) Accent else Color.White,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onSelectTrack(trackId) }
+                            .padding(4.dp)
+                    )
                 }
             }
         }
     }
 }
 
-private fun refreshAudioControls(
+private fun refreshAudioTracks(
     playerManager: PlayerManager,
     onUpdate: (List<Pair<Int, String>>, Int) -> Unit
 ) {
