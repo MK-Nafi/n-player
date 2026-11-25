@@ -1,5 +1,6 @@
 package com.nplayer.app.ui.navigation
 
+import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -11,13 +12,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.LibraryMusic
-import androidx.compose.material.icons.filled.PauseCircle
-import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material.icons.outlined.Folder
@@ -27,6 +24,7 @@ import androidx.compose.material.icons.outlined.VideoLibrary
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
@@ -49,8 +47,10 @@ import androidx.compose.ui.unit.dp
 import com.nplayer.app.data.settings.MainSection
 import com.nplayer.app.data.settings.SettingsRepository
 import com.nplayer.app.player.PlayerManager
+import com.nplayer.app.ui.player.PlayerScreen
 import com.nplayer.app.ui.theme.Accent
 import com.nplayer.app.ui.theme.BackgroundSecondary
+import com.nplayer.app.ui.theme.TextPrimary
 import com.nplayer.app.ui.theme.TextSecondary
 import kotlinx.coroutines.launch
 
@@ -125,20 +125,19 @@ fun MainNavigation(playerManager: PlayerManager) {
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            if (playingUri != null) {
+            val currentPlayingUri = playingUri
+            if (currentPlayingUri != null) {
                 PlayerScreen(
                     playerManager = playerManager,
-                    videoUri = playingUri!!,
+                    videoUri = currentPlayingUri,
                     title = playingTitle,
-                    onBack = {
-                        playingUri = null
-                    }
+                    onBack = { playingUri = null }
                 )
             } else {
                 when (currentSection) {
-                    MainSection.VIDEO -> VideoSectionPlaceholder()
-                    MainSection.AUDIO -> AudioSectionPlaceholder()
-                    MainSection.PLAYLISTS -> PlaylistsSectionPlaceholder()
+                    MainSection.VIDEO -> SectionPlaceholder("Video")
+                    MainSection.AUDIO -> SectionPlaceholder("Audio")
+                    MainSection.PLAYLISTS -> SectionPlaceholder("Playlists")
                     MainSection.BROWSE -> BrowseSection(
                         onVideoPicked = { uri, name ->
                             playingUri = uri
@@ -158,10 +157,15 @@ private fun BrowseSection(onVideoPicked: (Uri, String) -> Unit) {
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
         if (uri != null) {
-            context.contentResolver.takePersistableUriPermission(
-                uri,
-                Intent.FLAG_GRANT_READ_URI_PERMISSION
-            )
+            try {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            } catch (e: SecurityException) {
+                // Non-persistable URIs (e.g. from some file managers) are
+                // still playable for this session; ignore.
+            }
             val name = queryDisplayName(context, uri) ?: "Video"
             onVideoPicked(uri, name)
         }
@@ -175,12 +179,12 @@ private fun BrowseSection(onVideoPicked: (Uri, String) -> Unit) {
     ) {
         Text(
             text = "Browse",
-            style = androidx.compose.material3.MaterialTheme.typography.headlineSmall,
-            color = com.nplayer.app.ui.theme.TextPrimary
+            style = MaterialTheme.typography.headlineSmall,
+            color = TextPrimary
         )
         Text(
             text = "Pick any video file on this device to play it.",
-            style = androidx.compose.material3.MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.bodyMedium,
             color = TextSecondary
         )
         Card(
@@ -205,7 +209,7 @@ private fun BrowseSection(onVideoPicked: (Uri, String) -> Unit) {
                 )
                 Text(
                     text = "Choose a video file",
-                    color = com.nplayer.app.ui.theme.TextPrimary
+                    color = TextPrimary
                 )
             }
         }
@@ -221,30 +225,11 @@ private fun queryDisplayName(context: android.content.Context, uri: Uri): String
             null,
             null
         )?.use { cursor ->
-            if (cursor.moveToFirst()) {
-                cursor.getString(0)
-            } else {
-                null
-            }
+            if (cursor.moveToFirst()) cursor.getString(0) else null
         }
     } catch (e: Exception) {
         null
     }
-}
-
-@Composable
-private fun VideoSectionPlaceholder() {
-    SectionPlaceholder("Video")
-}
-
-@Composable
-private fun AudioSectionPlaceholder() {
-    SectionPlaceholder("Audio")
-}
-
-@Composable
-private fun PlaylistsSectionPlaceholder() {
-    SectionPlaceholder("Playlists")
 }
 
 @Composable
