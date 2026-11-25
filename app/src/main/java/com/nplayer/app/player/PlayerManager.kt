@@ -5,6 +5,7 @@ import android.net.Uri
 import org.videolan.libvlc.LibVLC
 import org.videolan.libvlc.Media
 import org.videolan.libvlc.MediaPlayer
+import org.videolan.libvlc.interfaces.IMedia
 
 /**
  * App-wide owner of the LibVLC instance and the media player.
@@ -22,26 +23,45 @@ class PlayerManager(context: Context) {
     val mediaPlayer: MediaPlayer = MediaPlayer(libVlc)
 
     private var currentMedia: Media? = null
+    private var currentFd: java.io.FileInputStream? = null
 
     /**
-     * Opens the given video URI and prepares it for playback.
+     * Opens the given video URI for playback.
      *
-     * VLC parses the media automatically when playback starts; no explicit
-     * parse call is needed. The PlayerScreen waits for duration > 0 before
-     * reading audio tracks, which only happens once parsing has completed.
+     * Uses a ParcelFileDescriptor rather than the raw content:// URI.
+     * Content URIs returned by the system file picker are not directly
+     * readable by VLC in all cases; a file descriptor always works.
      */
-    fun openMedia(uri: Uri) {
+    fun openMedia(context: android.content.Context, uri: Uri): Boolean {
+        stopAndReleaseMedia()
+        return try {
+            val pfd = context.contentResolver.openFileDescriptor(uri, "r")
+            if (pfd == null) return false
+            val fd = pfd.fileDescriptor
+            val media = Media(libVlc, fd)
+            currentFd = null
+            currentMedia = media
+            mediaPlayer.media = media
+            true
+        } catch (e: java.io.FileNotFoundException) {
+            false
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    private fun stopAndReleaseMedia() {
         currentMedia?.release()
-        val media = Media(libVlc, uri)
-        currentMedia = media
-        mediaPlayer.media = media
+        currentMedia = null
+        currentFd?.close()
+        currentFd = null
     }
 
     /** Releases LibVLC resources. Call once when the app process ends. */
     fun release() {
         mediaPlayer.stop()
         mediaPlayer.detachViews()
-        currentMedia?.release()
+        stopAndReleaseMedia()
         mediaPlayer.release()
         libVlc.release()
     }
