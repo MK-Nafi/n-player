@@ -14,10 +14,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.weight
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.AudioTrack
+import androidx.compose.material.icons.filled.Audiotrack
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Icon
@@ -43,8 +42,8 @@ import com.nplayer.app.player.PlayerManager
 import com.nplayer.app.ui.theme.Accent
 import com.nplayer.app.ui.theme.TextSecondary
 import kotlinx.coroutines.delay
-import org.videolan.libvlc.MediaPlayer
 import org.videolan.libvlc.util.VLCVideoLayout
+import java.util.Locale
 
 /**
  * Full-screen video player screen.
@@ -66,13 +65,13 @@ fun PlayerScreen(
     var controlsVisible by remember { mutableStateOf(true) }
     var positionMs by remember { mutableStateOf(0L) }
     var durationMs by remember { mutableStateOf(0L) }
-    var audioTracks by remember { mutableStateOf(listOf<MediaPlayer.TrackDescription>()) }
+    var audioTracks by remember { mutableStateOf(listOf<Pair<Int, String>>()) }
     var selectedTrackId by remember { mutableStateOf(-1) }
 
     // VLCVideoLayout provides the SurfaceView video output.
     val videoLayout = remember { VLCVideoLayout(context) }
 
-    DisposableEffect(Unit) {
+    DisposableEffect(videoUri) {
         playerManager.openMedia(videoUri)
         playerManager.mediaPlayer.attachViews(videoLayout)
         playerManager.mediaPlayer.play()
@@ -91,7 +90,7 @@ fun PlayerScreen(
     }
 
     // Poll position/duration 4 times per second.
-    LaunchedEffect(Unit) {
+    LaunchedEffect(videoUri) {
         while (true) {
             val player = playerManager.mediaPlayer
             positionMs = player.time
@@ -104,10 +103,9 @@ fun PlayerScreen(
     // Load audio tracks once the media has been parsed (duration becomes > 0).
     LaunchedEffect(durationMs) {
         if (durationMs > 0L && audioTracks.isEmpty()) {
-            val tracks = playerManager.mediaPlayer.audioTracks
-            if (tracks != null && tracks.isNotEmpty()) {
-                audioTracks = tracks.toList()
-                selectedTrackId = playerManager.mediaPlayer.audioTrack
+            refreshAudioTracks(playerManager) { tracks, selected ->
+                audioTracks = tracks
+                selectedTrackId = selected
             }
         }
     }
@@ -161,18 +159,18 @@ fun PlayerScreen(
                         modifier = Modifier
                             .weight(1f)
                             .padding(horizontal = 8.dp)
+                        // weight comes from RowScope — no import needed
                     )
                     IconButton(
                         onClick = {
-                            val tracks = playerManager.mediaPlayer.audioTracks
-                            if (tracks != null && tracks.isNotEmpty()) {
-                                audioTracks = tracks.toList()
-                                selectedTrackId = playerManager.mediaPlayer.audioTrack
+                            refreshAudioTracks(playerManager) { tracks, selected ->
+                                audioTracks = tracks
+                                selectedTrackId = selected
                             }
                         }
                     ) {
                         Icon(
-                            imageVector = Icons.Filled.AudioTrack,
+                            imageVector = Icons.Filled.Audiotrack,
                             contentDescription = "Audio tracks",
                             tint = Color.White
                         )
@@ -241,24 +239,33 @@ fun PlayerScreen(
                         .background(Color.Black.copy(alpha = 0.6f))
                         .padding(8.dp)
                 ) {
-                    audioTracks.forEach { track ->
-                        val name = track.name ?: "Track ${track.id}"
+                    audioTracks.forEach { (trackId, trackName) ->
                         Text(
-                            text = name,
-                            color = if (track.id == selectedTrackId) Accent else Color.White,
+                            text = trackName,
+                            color = if (trackId == selectedTrackId) Accent else Color.White,
                             style = MaterialTheme.typography.bodySmall,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable {
-                                    playerManager.mediaPlayer.setAudioTrack(track.id)
-                                    selectedTrackId = track.id
+                                    playerManager.mediaPlayer.setAudioTrack(trackId)
+                                    selectedTrackId = trackId
                                 }
                                 .padding(4.dp)
                         )
                     }
                 }
-            }
         }
+    }
+}
+
+private fun refreshAudioTracks(
+    playerManager: PlayerManager,
+    onUpdate: (List<Pair<Int, String>>, Int) -> Unit
+) {
+    val tracks = playerManager.mediaPlayer.audioTracks
+    if (tracks != null && tracks.isNotEmpty()) {
+        val selected = playerManager.mediaPlayer.audioTrack
+        onUpdate(tracks.map { it.id to (it.name ?: "Track ${it.id}") }, selected)
     }
 }
 
@@ -269,8 +276,8 @@ private fun formatTime(ms: Long): String {
     val minutes = (totalSeconds % 3600) / 60
     val seconds = totalSeconds % 60
     return if (hours > 0) {
-        String.format("%d:%02d:%02d", hours, minutes, seconds)
+        String.format(Locale.US, "%d:%02d:%02d", hours, minutes, seconds)
     } else {
-        String.format("%d:%02d", minutes, seconds)
+        String.format(Locale.US, "%d:%02d", minutes, seconds)
     }
 }
