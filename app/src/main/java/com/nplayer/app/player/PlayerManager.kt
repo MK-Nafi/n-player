@@ -5,7 +5,6 @@ import android.net.Uri
 import org.videolan.libvlc.LibVLC
 import org.videolan.libvlc.Media
 import org.videolan.libvlc.MediaPlayer
-import org.videolan.libvlc.interfaces.IMedia
 
 /**
  * App-wide owner of the LibVLC instance and the media player.
@@ -26,11 +25,14 @@ class PlayerManager(context: Context) {
 
     /**
      * Opens the given video URI and prepares it for playback.
+     *
+     * VLC parses the media automatically when playback starts; no explicit
+     * parse call is needed. The PlayerScreen waits for duration > 0 before
+     * reading audio tracks, which only happens once parsing has completed.
      */
     fun openMedia(uri: Uri) {
         currentMedia?.release()
         val media = Media(libVlc, uri)
-        media.parseAsync(IMedia.ParseLocal)
         currentMedia = media
         mediaPlayer.media = media
     }
