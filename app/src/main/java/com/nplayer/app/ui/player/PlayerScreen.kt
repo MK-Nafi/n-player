@@ -73,7 +73,9 @@ fun PlayerScreen(
 
     DisposableEffect(videoUri) {
         playerManager.openMedia(videoUri)
-        playerManager.mediaPlayer.attachViews(videoLayout)
+        // LibVLC 3.6.2 attachViews requires all four parameters:
+        // video layout, subtitle surface, preview texture, display manager.
+        playerManager.mediaPlayer.attachViews(videoLayout, null, null, null)
         playerManager.mediaPlayer.play()
         onDispose {
             playerManager.mediaPlayer.stop()

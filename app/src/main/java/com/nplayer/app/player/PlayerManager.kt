@@ -30,7 +30,7 @@ class PlayerManager(context: Context) {
     fun openMedia(uri: Uri) {
         currentMedia?.release()
         val media = Media(libVlc, uri)
-        media.parseAsync(IMedia.ParseType.ParseLocal)
+        media.parseAsync(IMedia.ParseLocal)
         currentMedia = media
         mediaPlayer.media = media
     }
